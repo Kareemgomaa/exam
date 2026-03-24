@@ -1,92 +1,46 @@
 import jwt from "jsonwebtoken";
+import { userModel } from "../dataBase/model/users.model.js";
 
-export const auth = (req, res, next) => {
+export const auth = async (req, res, next) => {
     try {
-        let { authorization } = req.headers;
+        const { authorization } = req.headers;
         if (!authorization) {
-            return res.json({ message: "token is required" });
+            return res.status(401).json({ message: "Token is required" });
         }
-        let [bearer, token] = authorization.split(" ");
-        let signature = "";
-        switch (bearer) {
-            case "admin":
-                signature = "nti2026";
-                break;
-            case "user":
-                signature = "nti2027";
-                break;
-            case "teacher":
-                signature = "nti2028";
-                break;
-            default:
-                signature = "nti2027"
+
+        if (!authorization.startsWith("Bearer ")) {
+            return res.status(401).json({ message: "Invalid token format" });
         }
-        let decode = jwt.verify(token, signature);
-        req.user = decode;
+
+        const token = authorization.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
+
+        const user = await userModel.findById(decoded._id).select('-password');
+        if (!user || !user.isActive) {
+            return res.status(401).json({ message: "The user associated with this token does not exist or is banned." });
+        }
+
+        req.user = user;
         next();
     } catch (error) {
-        return res.json({ message: "token error", error: error.message });
+        return res.status(401).json({ message: "Invalid or expired token", error: error.message });
     }
 };
-
-
-
 
 export const generateToken = (user) => {
     if (!user) {
         console.error("Error: user object is undefined in generateToken");
         return null;
     }
-
-    let signature = "";
-    switch (user.role) {
-        case "admin":
-            signature = "nti2026";
-            break;
-        case "user":
-            signature = "nti2027";
-            break;
-        case "teacher":
-            signature = "nti2028";
-            break;
-        default:
-            signature = "nti2027";
-    }
-
-    return jwt.sign({ _id: user._id, role: user.role }, signature, { expiresIn: "7d" });
+    const token = jwt.sign({ _id: user._id, role: user.role }, process.env.JWT_SECRET || 'default_secret', { expiresIn: "7d" });
+    return token;
 };
-
-
 
 export const allowedRoles = (roles) => {
     return (req, res, next) => {
-        try {
-            let { authorization } = req.headers;
-            if (!authorization) return res.json({ message: "token is required" });
-            let [bearer, token] = authorization.split(" ");
-            let signature = "";
-            switch (bearer) {
-                case "admin":
-                    signature = "nti2026";
-                    break;
-                case "user":
-                    signature = "nti2027";
-                    break;
-                case "teacher":
-                    signature = "nti2028";
-                    break;
-                default:
-                    signature = "nti2027";
-            }
-            let decode = jwt.verify(token, signature);
-            if (!roles.includes(decode.role)) {
-                return res.status(403).json({ message: "You don't have permission" });
-            }
-            req.user = decode;
-            next();
-        } catch (error) {
-            res.json({ message: "Invalid token", error: error.message });
+        if (!roles.includes(req.user.role)) {
+            return res.status(403).json({ message: "You are not authorized to perform this action." });
         }
+        next();
     };
 };
-

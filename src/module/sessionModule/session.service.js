@@ -49,11 +49,16 @@ export const getSessionById = async (req, res) => {
 export const updateSession = async (req, res) => {
     let { id } = req.params;
     let session = await sessionModel.findById(id);
-    if (!session) return res.json({ message: "session not found" })
-    if (session.course.toString() !== req.user._id) {
+    if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+    }
+
+    const course = await courseModel.findById(session.course);
+    if (!course || course.teacher.toString() !== req.user._id.toString()) {
         return res.json({ message: "You are not allowed to update this session" });
     }
-    let { title, order, contentType, filePath, duration } = req.body;
+
+    const { title, order, contentType, filePath, duration } = req.body;
     let updatedSession = await sessionModel.findByIdAndUpdate(
         id,
         { title, order, contentType, filePath, duration },
@@ -64,8 +69,12 @@ export const updateSession = async (req, res) => {
 export const deleteSession = async (req, res) => {
     let { id } = req.params;
     let session = await sessionModel.findById(id);
-    if (!session) return res.json({ message: "session not found" })
-    if (session.course.toString() !== req.user._id) {
+    if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+    }
+
+    const course = await courseModel.findById(session.course);
+    if (!course || course.teacher.toString() !== req.user._id.toString()) {
         return res.json({ message: "You are not allowed to delete this session" });
     }
     await sessionModel.findByIdAndDelete(id);
@@ -78,11 +87,25 @@ export const streamSessionVideo = async (req, res) => {
         if (!session) {
             return res.status(404).json({ message: "Session not found" });
         }
+
+        if (session.order > 1) {
+            const enrollment = await enrollmentModel.findOne({ student: req.user._id, course: session.course });
+            if (!enrollment) {
+                return res.status(403).json({ message: "You are not enrolled in this course." });
+            }
+
+            const previousSession = await sessionModel.findOne({ course: session.course, order: session.order - 1 });
+            if (previousSession && !enrollment.completedSessions.includes(previousSession._id)) {
+                return res.status(403).json({ message: "You must complete the previous session's quiz to access this one." });
+            }
+        }
+
         const user = req.user;
         let enrolleduser = await enrollmentModel.findOne({ student: user._id, course: session.course });
-        if (!enrolleduser) {
-            res.json({ message: "You are not enrolled in this course" });
+        if (user.role === 'user' && !enrolleduser) {
+            return res.status(403).json({ message: "You are not enrolled in this course" });
         }
+
         const course = await courseModel.findById(session.course);
         if (!course) {
             return res.status(404).json({ message: "Course for this session not found" });
@@ -141,21 +164,35 @@ export const streamSessionVideo = async (req, res) => {
 }
 export const downloadPdf = async (req, res) => {
     let { id } = req.params;
-    let session = await sessionModel.findById(id);
+    const session = await sessionModel.findById(id);
     if (!session) {
-        return res.json({ message: "session not found" })
+        return res.status(404).json({ message: "Session not found" });
     }
-    let course = await courseModel.findById(session.course);
-    if (!course) {
-        return res.json({ message: "course not found" })
-    }
-    let user = req.user;
-    console.log(user);
 
-    if (user.role === 'admin' || (user.role === 'teacher' || (user.role === 'user' && course.teacher.toString() === user._id.toString()))) {
+    if (session.order > 1) {
+        const enrollment = await enrollmentModel.findOne({ student: req.user._id, course: session.course });
+        if (!enrollment) {
+            return res.status(403).json({ message: "You are not enrolled in this course." });
+        }
+
+        const previousSession = await sessionModel.findOne({ course: session.course, order: session.order - 1 });
+        if (previousSession && !enrollment.completedSessions.includes(previousSession._id)) {
+            return res.status(403).json({ message: "You must complete the previous session's quiz to access this one." });
+        }
+    }
+
+    const user = req.user;
+    const course = await courseModel.findById(session.course);
+    if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+    }
+
+    const isEnrolled = await enrollmentModel.findOne({ student: user._id, course: session.course });
+    const isOwner = course.teacher.toString() === user._id.toString();
+
+    if (user.role === 'admin' || (user.role === 'teacher' && isOwner) || (user.role === 'user' && isEnrolled)) {
         res.download(session.filePath);
     } else {
-        return res.json({ message: "you don't have permission to download this file" })
+        return res.status(403).json({ message: "You don't have permission to download this file" });
     }
-
 }
