@@ -53,7 +53,7 @@ export const editing = async (req, res) => {
         if (!course) {
             return res.json({ message: "course not found" });
         }
-        if (course.teacher.toString() !== req.user._id) {
+        if (course.teacher.toString() !== req.user._id.toString()) {
             return res.json({ message: "you are not allowed to edit this course" });
         }
         let { title, description, price, thumbnail, category } = req.body;

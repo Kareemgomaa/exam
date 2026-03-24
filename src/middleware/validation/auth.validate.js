@@ -23,8 +23,8 @@ export const registerSchema = joi.object({
         "any.only": "Role must be one of 'user', 'admin', or 'teacher'",
         "any.required": "Role is required",
     }),
-    cardNumber: joi.string().optional().length(16).pattern(/^[0-9]+$/).messages({
-        "string.length": "Card number should be 16 digits",
+    cardNumber: joi.string().min(16).pattern(/^[0-9]+$/).messages({
+        "string.min": "Card number should be 16 digits",
         "string.pattern.base": "Card number should only contain digits",
         "any.required": "Card number is required",
     }),

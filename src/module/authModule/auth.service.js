@@ -1,5 +1,4 @@
 import { auth, generateToken } from "../../middleware/auth.js";
-
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { userModel } from "../../dataBase/model/users.model.js";
@@ -19,6 +18,7 @@ export const register = async (req, res) => {
         email,
         password: hashedPassword,
         role,
+        cardNumber,
     });
     if (user) {
         res.json({ message: "success", user: user });

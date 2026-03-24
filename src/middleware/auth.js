@@ -9,7 +9,7 @@ export const auth = async (req, res, next) => {
         }
 
         if (!authorization.startsWith("Bearer ")) {
-            return res.status(401).json({ message: "Invalid token format" });
+            return res.status(401).json({ message: "Invalid token format, expected 'Bearer <token>'" });
         }
 
         const token = authorization.split(" ")[1];
@@ -38,6 +38,9 @@ export const generateToken = (user) => {
 
 export const allowedRoles = (roles) => {
     return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ message: "User not authenticated. Ensure 'auth' middleware is placed before 'allowedRoles'." });
+        }
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({ message: "You are not authorized to perform this action." });
         }
