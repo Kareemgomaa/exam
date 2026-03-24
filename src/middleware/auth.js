@@ -9,7 +9,7 @@ export const auth = async (req, res, next) => {
         }
 
         if (!authorization.startsWith("Bearer ")) {
-            return res.status(401).json({ message: "Invalid token format, expected 'Bearer <token>'" });
+            return res.status(401).json({ message: "Invalid token format" });
         }
 
         const token = authorization.split(" ")[1];
@@ -17,7 +17,7 @@ export const auth = async (req, res, next) => {
 
         const user = await userModel.findById(decoded._id).select('-password');
         if (!user || !user.isActive) {
-            return res.status(401).json({ message: "The user associated with this token does not exist or is banned." });
+            return res.status(401).json({ message: "The user associated with this token does not exist." });
         }
 
         req.user = user;

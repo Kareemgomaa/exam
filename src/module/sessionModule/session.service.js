@@ -27,7 +27,6 @@ export const getSessionByCourseId = async (req, res) => {
         let course = await courseModel.findById(courseId);
         if (!course) return res.json({ message: "Course not found" });
 
-        // Allow teacher (owner) or admin to view sessions without enrollment
         let isOwner = course.teacher.toString() === req.user._id.toString();
         let isAdmin = req.user.role === 'admin';
         
@@ -130,7 +129,6 @@ export const streamSessionVideo = async (req, res) => {
         if (isOwner || isAdmin) {
             isAuthorized = true;
         } else {
-            // Student checks
             const enrollment = await enrollmentModel.findOne({ student: user._id, course: course._id });
             if (!enrollment) {
                 return res.status(403).json({ message: "You are not enrolled in this course." });
@@ -204,12 +202,10 @@ export const downloadPdf = async (req, res) => {
         const isOwner = course.teacher.toString() === user._id.toString();
         const isAdmin = user.role === 'admin';
 
-        // Allow owner or admin immediately
         if (isOwner || isAdmin) {
             return res.download(session.filePath);
         }
 
-        // Logic for students
         const enrollment = await enrollmentModel.findOne({ student: user._id, course: session.course });
         if (!enrollment) {
             return res.status(403).json({ message: "You are not enrolled in this course." });
